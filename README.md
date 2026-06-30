@@ -1,13 +1,13 @@
 # mini-coding-agent
 
-Java 8 + Maven 的最小命令行 Agent 学习项目。
+Java 8 + Maven command-line project for building a small Claude Code style coding agent.
 
-当前进度：
+Current progress:
 
-- 第 1 天：CLI + DeepSeek Chat Completion 调用
-- 第 2 天：手动工具系统，包括 `list_files`、`read_file`、`search_code`
+- Day 1: CLI + DeepSeek Chat Completion call
+- Day 2: read-only tool system with `list_files`, `read_file`, and `search_code`
 
-## 项目结构
+## Project Structure
 
 ```text
 mini-coding-agent/
@@ -34,57 +34,73 @@ mini-coding-agent/
                                 └── SearchCodeTool.java
 ```
 
-## 环境变量
+## Environment Variables
 
-聊天模式必填：
+You can configure the API key in either of two ways.
+
+Option 1: environment variables:
 
 ```powershell
 $env:DEEPSEEK_API_KEY="your-api-key"
 ```
 
-可选：
+Optional:
 
 ```powershell
 $env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
 $env:DEEPSEEK_MODEL="deepseek-v4-flash"
 ```
 
-`DEEPSEEK_BASE_URL` 默认值是 `https://api.deepseek.com`。
+Option 2: local config file:
 
-`DEEPSEEK_MODEL` 默认值是 `deepseek-v4-flash`。如果该模型不可用，到 DeepSeek 官方 API 文档查看当前可用模型，然后替换环境变量即可。
+```powershell
+copy config.properties.example config.properties
+```
 
-## 构建
+Then edit `config.properties`:
+
+```properties
+deepseek.apiKey=your-api-key
+deepseek.baseUrl=https://api.deepseek.com
+deepseek.model=deepseek-v4-flash
+```
+
+`config.properties` is ignored by Git, so your real API key should not be committed.
+
+`DEEPSEEK_BASE_URL` defaults to `https://api.deepseek.com`.
+
+`DEEPSEEK_MODEL` defaults to `deepseek-v4-flash`. If the model is unavailable, check the current DeepSeek API docs and set `DEEPSEEK_MODEL` to an available model.
+
+## Build
 
 ```powershell
 mvn package
 ```
 
-## 运行
+## Chat Mode
+
+Normal startup enters chat mode directly:
 
 ```powershell
 java -jar target/mini-coding-agent-1.0-SNAPSHOT.jar
 ```
 
-默认启动聊天模式。工具系统是 Agent 的内部能力，不要求用户在正常聊天时手动选择工具。
-
-## 聊天模式
+The app has a built-in system prompt. Users only enter their own request:
 
 ```text
-System prompt:
-You are a concise Java assistant.
-User prompt:
-Explain Java 8 Optional in one paragraph.
+>
+用一句话解释 Java Stream
 ```
 
-## 手动测试工具
+## Tool Test Mode
 
-Day 2 还没有实现 Agent Loop，所以工具只提供开发测试入口：
+The tool system is an internal agent capability. Day 2 does not implement the Agent Loop yet, so tools are exposed only through a development test entry:
 
 ```powershell
 java -jar target/mini-coding-agent-1.0-SNAPSHOT.jar --tool
 ```
 
-测试 `list_files`：
+Test `list_files`:
 
 ```text
 Tool name:
@@ -93,7 +109,7 @@ Parameters JSON, or blank for {}:
 {"path":"src/main/java/com/example/minicodingagent"}
 ```
 
-测试 `read_file`：
+Test `read_file`:
 
 ```text
 Tool name:
@@ -102,7 +118,7 @@ Parameters JSON, or blank for {}:
 {"path":"src/main/java/com/example/minicodingagent/tool/Tool.java"}
 ```
 
-测试 `search_code`：
+Test `search_code`:
 
 ```text
 Tool name:
@@ -111,21 +127,21 @@ Parameters JSON, or blank for {}:
 {"keyword":"ToolResult","path":"src/main/java"}
 ```
 
-路径越界会被拒绝：
+Path traversal is rejected:
 
 ```text
 {"path":"../mini-coding-agent-7day-plan.md"}
 ```
 
-会返回：
+Expected result:
 
 ```text
 Path is outside workspace: ../mini-coding-agent-7day-plan.md
 ```
 
-## 工具约束
+## Current Constraints
 
-- 只能读取当前 workspace 内的路径。
-- 不实现文件写入。
-- 不实现代码修改。
-- 不实现 Agent Loop。
+- The app can only read paths inside the current workspace.
+- It does not write files.
+- It does not modify code.
+- It does not implement the Agent Loop yet.

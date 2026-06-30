@@ -10,24 +10,33 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 
 public class ConsoleApp {
     private static final String DEFAULT_BASE_URL = "https://api.deepseek.com";
     private static final String DEFAULT_MODEL = "deepseek-v4-flash";
+    private static final String SYSTEM_PROMPT =
+            "You are Mini Coding Agent, a simple Claude Code style assistant. "
+                    + "Help the user understand and work with Java projects. "
+                    + "Keep answers practical, concise, and focused on the user's request.";
 
     private final Scanner scanner = new Scanner(System.in);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ToolRegistry toolRegistry;
+    private final Properties configProperties;
 
     public ConsoleApp() {
         Path workspaceRoot = Paths.get("").toAbsolutePath().normalize();
+        this.configProperties = loadConfig(workspaceRoot);
         this.toolRegistry = new ToolRegistry();
         this.toolRegistry.register(new ListFilesTool(workspaceRoot));
         this.toolRegistry.register(new ReadFileTool(workspaceRoot));
@@ -43,22 +52,20 @@ public class ConsoleApp {
     }
 
     private void runChatMode() {
-        String apiKey = getenv("DEEPSEEK_API_KEY", null);
-        String baseUrl = getenv("DEEPSEEK_BASE_URL", DEFAULT_BASE_URL);
-        String model = getenv("DEEPSEEK_MODEL", DEFAULT_MODEL);
+        String apiKey = configValue("DEEPSEEK_API_KEY", "deepseek.apiKey", null);
+        String baseUrl = configValue("DEEPSEEK_BASE_URL", "deepseek.baseUrl", DEFAULT_BASE_URL);
+        String model = configValue("DEEPSEEK_MODEL", "deepseek.model", DEFAULT_MODEL);
 
         if (apiKey == null || apiKey.trim().isEmpty()) {
-            System.err.println("Missing environment variable: DEEPSEEK_API_KEY");
+            System.err.println("Missing API key. Set DEEPSEEK_API_KEY or deepseek.apiKey in config.properties.");
             System.exit(1);
         }
 
-        System.out.println("System prompt:");
-        String systemPrompt = scanner.nextLine();
-        System.out.println("User prompt:");
+        System.out.print("> ");
         String userPrompt = scanner.nextLine();
 
         List<Message> messages = Arrays.asList(
-                new Message("system", systemPrompt),
+                new Message("system", SYSTEM_PROMPT),
                 new Message("user", userPrompt)
         );
 
@@ -117,11 +124,33 @@ public class ConsoleApp {
         }
     }
 
-    private static String getenv(String name, String defaultValue) {
-        String value = System.getenv(name);
-        if (value == null || value.trim().isEmpty()) {
-            return defaultValue;
+    private static Properties loadConfig(Path workspaceRoot) {
+        Properties properties = new Properties();
+        Path configPath = workspaceRoot.resolve("config.properties");
+        if (!Files.exists(configPath)) {
+            return properties;
         }
-        return value;
+
+        try (InputStream inputStream = Files.newInputStream(configPath)) {
+            properties.load(inputStream);
+        } catch (IOException e) {
+            System.err.println("Failed to read config.properties: " + e.getMessage());
+            System.exit(1);
+        }
+        return properties;
+    }
+
+    private String configValue(String envName, String propertyName, String defaultValue) {
+        String envValue = System.getenv(envName);
+        if (envValue != null && !envValue.trim().isEmpty()) {
+            return envValue;
+        }
+
+        String propertyValue = configProperties.getProperty(propertyName);
+        if (propertyValue != null && !propertyValue.trim().isEmpty()) {
+            return propertyValue;
+        }
+
+        return defaultValue;
     }
 }

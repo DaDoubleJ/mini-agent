@@ -1,0 +1,3 @@
+deepseek.apiKey=your-api-key
+deepseek.baseUrl=https://api.deepseek.com
+deepseek.model=deepseek-v4-flash
