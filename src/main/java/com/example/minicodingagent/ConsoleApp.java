@@ -1,10 +1,13 @@
 package com.example.minicodingagent;
 
+import com.example.minicodingagent.agent.Agent;
 import com.example.minicodingagent.tool.Tool;
 import com.example.minicodingagent.tool.ToolRegistry;
 import com.example.minicodingagent.tool.ToolResult;
+import com.example.minicodingagent.tool.impl.CreateFileTool;
 import com.example.minicodingagent.tool.impl.ListFilesTool;
 import com.example.minicodingagent.tool.impl.ReadFileTool;
+import com.example.minicodingagent.tool.impl.ReplaceInFileTool;
 import com.example.minicodingagent.tool.impl.SearchCodeTool;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,9 +17,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
@@ -24,10 +25,6 @@ import java.util.Scanner;
 public class ConsoleApp {
     private static final String DEFAULT_BASE_URL = "https://api.deepseek.com";
     private static final String DEFAULT_MODEL = "deepseek-v4-flash";
-    private static final String SYSTEM_PROMPT =
-            "You are Mini Coding Agent, a simple Claude Code style assistant. "
-                    + "Help the user understand and work with Java projects. "
-                    + "Keep answers practical, concise, and focused on the user's request.";
 
     private final Scanner scanner = new Scanner(System.in);
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -41,6 +38,8 @@ public class ConsoleApp {
         this.toolRegistry.register(new ListFilesTool(workspaceRoot));
         this.toolRegistry.register(new ReadFileTool(workspaceRoot));
         this.toolRegistry.register(new SearchCodeTool(workspaceRoot));
+        this.toolRegistry.register(new CreateFileTool(workspaceRoot));
+        this.toolRegistry.register(new ReplaceInFileTool(workspaceRoot));
     }
 
     public void run(String[] args) {
@@ -64,14 +63,10 @@ public class ConsoleApp {
         System.out.print("> ");
         String userPrompt = scanner.nextLine();
 
-        List<Message> messages = Arrays.asList(
-                new Message("system", SYSTEM_PROMPT),
-                new Message("user", userPrompt)
-        );
-
         ChatClient client = new ChatClient(apiKey, baseUrl, model);
+        Agent agent = new Agent(client, toolRegistry);
         try {
-            String answer = client.chat(messages);
+            String answer = agent.run(userPrompt);
             System.out.println();
             System.out.println("Assistant:");
             System.out.println(answer);

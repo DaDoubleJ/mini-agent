@@ -6,35 +6,39 @@ Current progress:
 
 - Day 1: CLI + DeepSeek Chat Completion call
 - Day 2: read-only tool system with `list_files`, `read_file`, and `search_code`
+- Day 3: Agent Loop that lets the model choose tools and return a final answer
+- Day 4: write tools with `create_file` and `replace_in_file`
 
 ## Project Structure
 
 ```text
 mini-coding-agent/
-├── pom.xml
-├── README.md
-└── src/
-    └── main/
-        └── java/
-            └── com/
-                └── example/
-                    └── minicodingagent/
-                        ├── ChatClient.java
-                        ├── ConsoleApp.java
-                        ├── Main.java
-                        ├── Message.java
-                        └── tool/
-                            ├── Tool.java
-                            ├── ToolRegistry.java
-                            ├── ToolResult.java
-                            ├── WorkspacePath.java
-                            └── impl/
-                                ├── ListFilesTool.java
-                                ├── ReadFileTool.java
-                                └── SearchCodeTool.java
+|-- pom.xml
+|-- README.md
+|-- config.properties.example
+`-- src/main/java/com/example/minicodingagent/
+    |-- ChatClient.java
+    |-- ConsoleApp.java
+    |-- Main.java
+    |-- Message.java
+    |-- agent/
+    |   |-- Agent.java
+    |   |-- AgentDecision.java
+    |   `-- AgentPrompts.java
+    `-- tool/
+        |-- Tool.java
+        |-- ToolRegistry.java
+        |-- ToolResult.java
+        |-- WorkspacePath.java
+        `-- impl/
+            |-- ListFilesTool.java
+            |-- CreateFileTool.java
+            |-- ReadFileTool.java
+            |-- ReplaceInFileTool.java
+            `-- SearchCodeTool.java
 ```
 
-## Environment Variables
+## Configuration
 
 You can configure the API key in either of two ways.
 
@@ -42,11 +46,6 @@ Option 1: environment variables:
 
 ```powershell
 $env:DEEPSEEK_API_KEY="your-api-key"
-```
-
-Optional:
-
-```powershell
 $env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
 $env:DEEPSEEK_MODEL="deepseek-v4-flash"
 ```
@@ -77,9 +76,9 @@ deepseek.model=deepseek-v4-flash
 mvn package
 ```
 
-## Chat Mode
+## Agent Mode
 
-Normal startup enters chat mode directly:
+Normal startup enters agent mode directly:
 
 ```powershell
 java -jar target/mini-coding-agent-1.0-SNAPSHOT.jar
@@ -88,13 +87,27 @@ java -jar target/mini-coding-agent-1.0-SNAPSHOT.jar
 The app has a built-in system prompt. Users only enter their own request:
 
 ```text
->
-用一句话解释 Java Stream
+> Read ToolRegistry and summarize what it does
 ```
+
+The model must return JSON internally:
+
+```json
+{"type":"tool_call","tool":"read_file","arguments":{"path":"src/main/java/com/example/minicodingagent/tool/ToolRegistry.java"}}
+```
+
+or:
+
+```json
+{"type":"final","answer":"ToolRegistry stores tools by name and lets the agent register, find, and list them."}
+```
+
+The Agent Loop prints each model decision and a short tool result summary.
+Write tools also print the target path and change summary before writing.
 
 ## Tool Test Mode
 
-The tool system is an internal agent capability. Day 2 does not implement the Agent Loop yet, so tools are exposed only through a development test entry:
+The tool system is an internal agent capability. You can still use a development test entry:
 
 ```powershell
 java -jar target/mini-coding-agent-1.0-SNAPSHOT.jar --tool
@@ -127,6 +140,42 @@ Parameters JSON, or blank for {}:
 {"keyword":"ToolResult","path":"src/main/java"}
 ```
 
+Test `create_file`:
+
+```text
+Tool name:
+create_file
+Parameters JSON, or blank for {}:
+{"path":"tmp/day4-demo.txt","content":"hello day4"}
+```
+
+Expected result:
+
+```text
+[write] create_file path: tmp\day4-demo.txt
+[write] summary: create new file, bytes=10
+Tool success:
+Created file: tmp\day4-demo.txt
+```
+
+Test `replace_in_file`:
+
+```text
+Tool name:
+replace_in_file
+Parameters JSON, or blank for {}:
+{"path":"tmp/day4-demo.txt","oldText":"hello","newText":"hi"}
+```
+
+Expected result:
+
+```text
+[write] replace_in_file path: tmp\day4-demo.txt
+[write] summary: occurrences=1, oldTextLength=5, newTextLength=2
+Tool success:
+Replaced 1 occurrence(s) in file: tmp\day4-demo.txt
+```
+
 Path traversal is rejected:
 
 ```text
@@ -142,6 +191,9 @@ Path is outside workspace: ../mini-coding-agent-7day-plan.md
 ## Current Constraints
 
 - The app can only read paths inside the current workspace.
-- It does not write files.
-- It does not modify code.
-- It does not implement the Agent Loop yet.
+- Write tools can only create files or replace exact text inside the current workspace.
+- Write tools refuse to modify the `.git` directory.
+- `create_file` fails if the target file already exists.
+- `replace_in_file` fails if `oldText` is not found.
+- It does not implement function calling.
+- It does not stream output.
